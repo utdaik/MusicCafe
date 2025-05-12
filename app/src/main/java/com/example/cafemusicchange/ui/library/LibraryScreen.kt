@@ -17,6 +17,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -88,7 +90,7 @@ fun PlaylistScreen(
                     modifier = Modifier.size(110.dp),
                     iconRes = R.drawable.like,
                     label   = "Yêu thích",
-                    onClick = { /*…*/ }
+                    onClick = {navController.navigate("favorite/$userId") }
                 )
                 LibraryCategoryCard(
                     modifier = Modifier.size(110.dp),
@@ -351,5 +353,23 @@ fun LibraryCategoryCard(
     }
 }
 
+@Composable
+fun HeartCheckbox(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    IconToggleButton(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        modifier = modifier
+    ) {
+        Icon(
+            imageVector = if (checked) Icons.Filled.Favorite else Icons.Default.FavoriteBorder,
+            contentDescription = null,
+            tint = if (checked) Color.Red else Color.Gray
+        )
+    }
+}
 
 

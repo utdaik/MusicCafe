@@ -6,7 +6,10 @@ import com.example.cafemusicchange.repository.JamendoRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.withContext
 
@@ -95,58 +98,86 @@ class MusicRepository @Inject constructor(
 
 
     // ======================== FAVORITE ========================
-    /** Flow báo trạng thái yêu thích */
     fun isSongFavoriteFlow(songId: Long, userId: Long): Flow<Boolean> =
         appDao.isSongFavoriteFlow(songId, userId)
 
-    /** Thêm / bỏ yêu thích */
-    suspend fun toggleFavorite(songId: Long, userId: Long) = withContext(Dispatchers.IO) {
-        val exists = appDao.isSongFavoriteFlow(songId, userId).first()
-        if (exists) appDao.removeFavorite(songId, userId)
-        else        appDao.addFavorite(FavoriteSong(songId, userId))
+    suspend fun addFavoriteSong(songId: Long, userId: Long) = withContext(Dispatchers.IO) {
+        appDao.addFavorite(FavoriteSong(songId, userId))
     }
 
+    suspend fun removeFavoriteSong(songId: Long, userId: Long) = withContext(Dispatchers.IO) {
+        appDao.removeFavorite(songId, userId)
+    }
 
-// ======================== DOWNLOADED ========================
-    /** Flow báo trạng thái đã tải về */
+    suspend fun toggleFavoriteSong(songId: Long, userId: Long) = withContext(Dispatchers.IO) {
+        val currentlyFav = appDao.isSongFavoriteFlow(songId, userId).first()
+        if (currentlyFav) appDao.removeFavorite(songId, userId)
+        else              appDao.addFavorite(FavoriteSong(songId, userId))
+    }
+
+    /** Lấy danh sách JamendoTrack đã favorite */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun getFavoriteTracks(userId: Long): Flow<List<JamendoTrack>> =
+        appDao.getFavoriteIdsFlow(userId)   // Flow<List<Long>>
+            .flatMapLatest { ids ->
+                flow {
+                    // lần lượt gọi API cho từng id và gom về List<JamendoTrack>
+                    val tracks = ids.mapNotNull { id ->
+                        jamendoApiService.getTrackById(id.toString())
+                            .takeIf { it.isSuccessful }
+                            ?.body()
+                            ?.tracks
+                            ?.firstOrNull()
+                    }
+                    emit(tracks)
+                }
+            }
+
+
+    // ======================== DOWNLOADED ========================
+
     fun isSongDownloadedFlow(songId: Long, userId: Long): Flow<Boolean> =
         appDao.isSongDownloadedFlow(songId, userId)
 
-    /** Ghi nhận / huỷ bản ghi tải về (với đường dẫn file trên máy) */
+    /** Thêm / xóa bản ghi downloaded (với đường dẫn file trên máy) */
     suspend fun toggleDownloaded(songId: Long, userId: Long, filePath: String) = withContext(Dispatchers.IO) {
         val exists = appDao.isSongDownloadedFlow(songId, userId).first()
         if (exists) appDao.removeDownloaded(songId, userId)
         else        appDao.addDownloaded(DownloadedSong(songId, userId, filePath))
     }
 
+    /** Lấy danh sách JamendoTrack đã download */
+    fun getDownloadedTracks(userId: Long): Flow<List<JamendoTrack>> = flow {
+        val ids = appDao.getDownloadedSongIds(userId)
+        emit(ids)
+    }.mapLatest { ids ->
+        if (ids.isEmpty()) emptyList()
+        else {
+            val csv = ids.joinToString(",")
+            jamendoApiService.getTrackById(csv).body()?.tracks ?: emptyList()
+        }
+    }
 
-// ======================== HISTORY ========================
-    /**
-     * Ghi nhận bài vừa phát:
-     * 1) Xoá record cũ nếu có
-     * 2) Chèn mới để ROWID luôn tăng → lấy ra mới nhất lên đầu
-     */
+
+    // ======================== HISTORY ========================
+
+    /** Ghi nhận bài vừa phát */
     suspend fun markPlayed(songId: Long, userId: Long) = withContext(Dispatchers.IO) {
         appDao.deleteHistory(songId, userId)
         appDao.insertHistory(HistorySong(songId, userId))
     }
 
-    /**
-     * Flow danh sách 10 bài nghe gần đây nhất,
-     * chuyển thành JamendoTrack bằng API
-     */
-    fun getRecentHistoryTracks(userId: Long, limit: Int = 10): Flow<List<JamendoTrack>> =
-        flow {
-            val ids = appDao.getRecentHistoryIds(userId, limit) // List<Long>
-            emit(ids)
-        }.mapLatest { ids ->
-            if (ids.isEmpty()) emptyList()
-            else {
-                val csv = ids.joinToString(",")
-                jamendoApiService.getTrackById(csv)
-                    .body()
-                    ?.tracks
-                    ?: emptyList()
-            }
+    /** Lấy danh sách 10 bài nghe gần đây nhất → JamendoTrack */
+    fun getRecentHistoryTracks(userId: Long, limit: Int = 10): Flow<List<JamendoTrack>> = flow {
+        val ids = appDao.getRecentHistoryIds(userId, limit)
+        emit(ids)
+    }.mapLatest { ids ->
+        if (ids.isEmpty()) emptyList()
+        else {
+            val csv = ids.joinToString(",")
+            jamendoApiService.getTrackById(csv).body()?.tracks ?: emptyList()
         }
+    }
+
 }
+

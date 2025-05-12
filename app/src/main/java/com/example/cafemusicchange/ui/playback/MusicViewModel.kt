@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
+import com.example.cafemusicchange.MainViewModel
 import com.example.cafemusicchange.api.JamendoTrack
 import com.example.cafemusicchange.reponsitory.MusicRepository
 import com.example.cafemusicchange.repository.JamendoRepository
@@ -28,9 +29,8 @@ data class PlaybackState(
 
 @HiltViewModel
 class MusicPlayer @Inject constructor(
-    private val repository: JamendoRepository,
     private val exoPlayer: ExoPlayer,
-    private val db : MusicRepository
+    private val db : MusicRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PlaybackState())
@@ -38,13 +38,17 @@ class MusicPlayer @Inject constructor(
 
 
     private val _currentQueue = MutableStateFlow<List<JamendoTrack>>(emptyList()) // 🔥 Danh sách nhạc hiện tại
-    val currentQueue: StateFlow<List<JamendoTrack>> = _currentQueue.asStateFlow()
+//    val currentQueue: StateFlow<List<JamendoTrack>> = _currentQueue.asStateFlow()
 
     private val _currentTrackIndex = MutableStateFlow(0) // 🔥 Vị trí bài hát hiện tại trong danh sách
-    val currentTrackIndex: StateFlow<Int> = _currentTrackIndex.asStateFlow()
+//    val currentTrackIndex: StateFlow<Int> = _currentTrackIndex.asStateFlow()
+
+    private val _isFavorite = MutableStateFlow(false)
+    val isFavorite: StateFlow<Boolean> = _isFavorite.asStateFlow()
 
     private val _currentTrack = MutableStateFlow<JamendoTrack?>(null) // 🔥 Bài hát hiện tại
     val tracks = _currentTrack.asStateFlow()
+
 
     init {
         observePlayer()
@@ -53,37 +57,37 @@ class MusicPlayer @Inject constructor(
     /**
      * Lấy thông tin bài hát từ Deezer API, tránh gọi lại API khi đã có dữ liệu.
      */
-    private var currentTrackId: String? = null
+//    private var currentTrackId: String? = null
 
-    fun playTrack(trackId: String) {
-        currentTrackId = trackId
-        viewModelScope.launch {
-            val track = _currentQueue.value.find { it.id.toString() == trackId }
-            if (track != null) {
-                _currentTrack.value = track
-                setMediaSource(track.audioUrl ?: return@launch)
-            } else {
-                // Nếu không có trong danh sách, gọi API như trước
-                val response = repository.getTrackById(trackId)
-                if (response.isSuccessful) {
-                    response.body()?.tracks?.firstOrNull()?.let {
-                        _currentTrack.value = it
-                        setMediaSource(it.audioUrl ?: return@launch)
-                    }
-                }
-            }
-        }
-    }
+//    fun playTrack(trackId: String) {
+//        currentTrackId = trackId
+//        viewModelScope.launch {
+//            val track = _currentQueue.value.find { it.id.toString() == trackId }
+//            if (track != null) {
+//                _currentTrack.value = track
+//                setMediaSource(track.audioUrl ?: return@launch)
+//            } else {
+//                // Nếu không có trong danh sách, gọi API như trước
+//                val response = repository.getTrackById(trackId)
+//                if (response.isSuccessful) {
+//                    response.body()?.tracks?.firstOrNull()?.let {
+//                        _currentTrack.value = it
+//                        setMediaSource(it.audioUrl ?: return@launch)
+//                    }
+//                }
+//            }
+//        }
+//    }
 
 
-    fun setQueue(tracksJson: String, startIndex: Int) {
+    fun setQueue(tracksJson: String, startIndex: Int, userId: Long) {
         viewModelScope.launch {
             try {
                 val tracks: List<JamendoTrack> = Gson().fromJson(tracksJson, object : TypeToken<List<JamendoTrack>>() {}.type)
                 _currentQueue.value = tracks
                 _currentTrackIndex.value = startIndex
                 _currentTrack.value = tracks[startIndex] // Cập nhật bài hát hiện tại
-
+                refreshFavorite(tracks[startIndex].id, userId)
                 setMediaSource(tracks[startIndex].audioUrl ?: "") // Phát bài hát đầu tiên
             } catch (e: Exception) {
                 Log.e("MusicPlayer", "Lỗi khi thiết lập danh sách phát", e)
@@ -209,6 +213,24 @@ class MusicPlayer @Inject constructor(
 
     fun seekTo(position: Long) {
         exoPlayer.seekTo(position)
+    }
+
+
+    private fun refreshFavorite(songId: Long, userId: Long) {
+        viewModelScope.launch {
+            db.isSongFavoriteFlow(songId, userId)
+                .collect { fav -> _isFavorite.value = fav }
+        }
+    }
+
+    /**
+     * Toggle favorite: nếu đã có thì xóa, chưa có thì thêm
+     */
+    fun toggleFavorite(songId: Long, userId: Long) {
+        viewModelScope.launch {
+            db.toggleFavoriteSong(songId, userId)
+            refreshFavorite(songId, userId)
+        }
     }
 
 }

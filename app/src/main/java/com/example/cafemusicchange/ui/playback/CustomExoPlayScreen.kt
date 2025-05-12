@@ -32,6 +32,7 @@ fun CustomExoPlayerScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val trackState by viewModel.tracks.collectAsState()
+    val isFav by viewModel.isFavorite.collectAsState()
     val mainState = mainViewModel.uiState.collectAsState()
     var userId = mainState.value.userId
 
@@ -71,15 +72,24 @@ fun CustomExoPlayerScreen(
             style = MaterialTheme.typography.bodyMedium
         )
         Spacer(modifier = Modifier.height(30.dp))
-        Row {
-            IconButton(onClick = {}) {
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) { if (trackState != null && userId != null) {
+            IconButton(
+                onClick = { viewModel.toggleFavorite(trackState!!.id, userId) }
+            ) {
                 Icon(
-                    imageVector = Icons.Filled.Favorite,
-                    contentDescription = "Favorite",
-                    modifier = Modifier.size(48.dp)
+                    imageVector = if (isFav) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    contentDescription = if (isFav) "Unfavorite" else "Favorite",
+                    tint = if (isFav) Color.Red else Color.Gray,
+                    modifier = Modifier.size(32.dp)
                 )
             }
         }
+        }
+
         // Thanh slider và thời gian
         PlaybackSlider(
             sliderPosition = sliderPosition,

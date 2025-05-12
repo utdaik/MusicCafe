@@ -33,6 +33,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.cafemusicchange.ui.home.HomeScreen
+import com.example.cafemusicchange.ui.library.FavoriteScreen
 import com.example.cafemusicchange.ui.login.SignInScreen
 import com.example.cafemusicchange.ui.login.SignUpScreen
 import com.example.cafemusicchange.ui.login.WelcomeScreen
@@ -53,7 +54,9 @@ sealed class Screen(val route: String) {
     object Settings : Screen("settings")
     object Playlist : Screen("playlist")
     object PlaylistDetail : Screen("playlist_detail")
-    object MiniPlayer : Screen("miniPlayer")
+    object Favorite : Screen("favorite")
+    object Download : Screen("download")
+    object History : Screen("history")
 }
 
 @Composable
@@ -103,13 +106,14 @@ fun Navigation() {
             }
         }
     ) { paddingValues ->
-        Column(Modifier
-            .fillMaxSize()
-            .padding(paddingValues)
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
         ) {
             NavHost(
                 navController = navController,
-                startDestination = Screen.Home.route,
+                startDestination = Screen.Welcome.route,
                 enterTransition = { slideInHorizontally(initialOffsetX = { it }) },
                 exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) },
                 popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) },
@@ -150,6 +154,11 @@ fun Navigation() {
 
                 composable(Screen.Settings.route) {
                     SettingScreen()
+                }
+
+                composable("favorite/{userId}") { backStackEntry ->
+                    val userId = backStackEntry.arguments?.getString("userId")?.toLongOrNull() ?: 0L
+                    FavoriteScreen(navController, hiltViewModel(), userId)
                 }
 
             }

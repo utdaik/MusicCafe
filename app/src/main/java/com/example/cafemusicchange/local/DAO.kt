@@ -77,54 +77,61 @@ interface AppDao {
     @Query("DELETE FROM playlist_song WHERE playlistId = :playlistId AND userId = :userId")
     suspend fun clearSongsInPlaylist(playlistId: Long, userId: Long)
 
-    // ========== FAVORITE ==========
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun addFavorite(fav: FavoriteSong)
+    // ======================== FAVORITE ========================
 
+    /** Flow báo trạng thái đã favorite hay chưa */
+    @Query("SELECT EXISTS(SELECT 1 FROM favorite_song WHERE songId = :songId AND userId = :userId)")
+    fun isSongFavoriteFlow(songId: Long, userId: Long): Flow<Boolean>
+
+    /** Thêm 1 bài vào bảng favorite */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun addFavorite(favorite: FavoriteSong)
+
+    /** Xóa 1 bài khỏi bảng favorite */
     @Query("DELETE FROM favorite_song WHERE songId = :songId AND userId = :userId")
     suspend fun removeFavorite(songId: Long, userId: Long)
 
-    @Query("""
-    SELECT COUNT(*) > 0
-    FROM favorite_song
-    WHERE songId = :songId AND userId = :userId
-  """)
-    fun isSongFavoriteFlow(songId: Long, userId: Long): Flow<Boolean>
+    /** Lấy list songId đã favorite để chuyển thành JamendoTrack */
+    @Query("SELECT songId FROM favorite_song WHERE userId = :userId")
+    fun getFavoriteIdsFlow(userId: Long): Flow<List<Long>>
 
-    // ========== DOWNLOADED ==========
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun addDownloaded(download: DownloadedSong)
 
+    // ======================== DOWNLOADED ========================
+
+    /** Flow báo trạng thái đã tải về hay chưa */
+    @Query("SELECT EXISTS(SELECT 1 FROM downloaded_song WHERE songId = :songId AND userId = :userId)")
+    fun isSongDownloadedFlow(songId: Long, userId: Long): Flow<Boolean>
+
+    /** Thêm bản ghi downloaded (ghi đè nếu đã tồn tại) */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun addDownloaded(downloaded: DownloadedSong)
+
+    /** Xóa bản ghi downloaded */
     @Query("DELETE FROM downloaded_song WHERE songId = :songId AND userId = :userId")
     suspend fun removeDownloaded(songId: Long, userId: Long)
 
-    @Query("""
-    SELECT COUNT(*) > 0
-    FROM downloaded_song
-    WHERE songId = :songId AND userId = :userId
-  """)
-    fun isSongDownloadedFlow(songId: Long, userId: Long): Flow<Boolean>
+    /** Lấy list songId đã download để hiển thị offline */
+    @Query("SELECT songId FROM downloaded_song WHERE userId = :userId")
+    suspend fun getDownloadedSongIds(userId: Long): List<Long>
 
-    // ========== HISTORY ==========
-    // Dùng REPLACE để nếu đã tồn tại songId,userId thì xóa & chèn lại → ROWID mới
-    @Insert
-    suspend fun insertHistory(historySong: HistorySong)
 
-    // Xoá bản ghi cũ nếu đã có
-    @Query("""
-    DELETE FROM history_song
-     WHERE songId = :songId
-       AND userId = :userId
-  """)
+    // ======================== HISTORY ========================
+
+    /** Xóa bỏ record cũ trước khi insert vào để RowId tăng → lấy mới nhất lên đầu */
+    @Query("DELETE FROM history_song WHERE songId = :songId AND userId = :userId")
     suspend fun deleteHistory(songId: Long, userId: Long)
 
-    // Lấy các songId theo thứ tự chèn (ROWID DESC), mới nghe nhất lên đầu
+    /** Thêm record mới (với REPLACE sẽ ghi đè nếu có) */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertHistory(history: HistorySong)
+
+    /** Lấy list songId nghe gần đây, RowId DESC → mới nhất lên đầu, giới hạn limit */
     @Query("""
-    SELECT songId
-      FROM history_song
-     WHERE userId = :userId
-     ORDER BY ROWID DESC
-     LIMIT :limit
+    SELECT songId 
+    FROM history_song 
+    WHERE userId = :userId 
+    ORDER BY rowid DESC 
+    LIMIT :limit
   """)
     suspend fun getRecentHistoryIds(userId: Long, limit: Int): List<Long>
 

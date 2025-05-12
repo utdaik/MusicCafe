@@ -20,8 +20,11 @@ fun PlayScreen(
     navHostController: NavHostController,
     mainViewModel: MainViewModel
 ) {
+    val userId = mainViewModel.uiState.collectAsState().value.userId
     LaunchedEffect(tracksJson, startIndex) {
-        viewModel.setQueue(tracksJson, startIndex)
+        if (userId != null) {
+            viewModel.setQueue(tracksJson, startIndex,userId)
+        }
     }
 
     CustomExoPlayerScreen(viewModel = viewModel, navHostController,mainViewModel)
