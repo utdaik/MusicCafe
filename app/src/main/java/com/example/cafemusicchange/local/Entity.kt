@@ -42,13 +42,13 @@ data class FavoriteSong(
     val userId: Long
 )
 
-@Entity(
-    tableName = "downloaded_song",
-    primaryKeys = ["songId", "userId"]
-)
+@Entity(tableName = "downloaded_song", primaryKeys = ["songId"])
 data class DownloadedSong(
     val songId: Long,
-    val userId: Long,
+    val title: String,
+    val artist: String,
+    val albumImage: String,
     val filePath: String
 )
+
 

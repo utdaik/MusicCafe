@@ -33,6 +33,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.cafemusicchange.ui.home.HomeScreen
+import com.example.cafemusicchange.ui.library.DownloadScreen
 import com.example.cafemusicchange.ui.library.FavoriteScreen
 import com.example.cafemusicchange.ui.login.SignInScreen
 import com.example.cafemusicchange.ui.login.SignUpScreen
@@ -159,6 +160,10 @@ fun Navigation() {
                 composable("favorite/{userId}") { backStackEntry ->
                     val userId = backStackEntry.arguments?.getString("userId")?.toLongOrNull() ?: 0L
                     FavoriteScreen(navController, hiltViewModel(), userId)
+                }
+
+                composable("download") { backStackEntry ->
+                    DownloadScreen(navController, hiltViewModel())
                 }
 
             }

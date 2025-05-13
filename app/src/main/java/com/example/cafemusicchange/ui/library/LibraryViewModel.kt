@@ -7,6 +7,7 @@ import androidx.media3.common.util.Log
 import androidx.media3.common.util.UnstableApi
 import com.example.cafemusicchange.api.JamendoApiService
 import com.example.cafemusicchange.api.JamendoTrack
+import com.example.cafemusicchange.local.DownloadedSong
 import com.example.cafemusicchange.local.Playlist
 import com.example.cafemusicchange.local.PlaylistSong
 import com.example.cafemusicchange.reponsitory.MusicRepository
@@ -34,8 +35,8 @@ class PlaylistViewModel @Inject constructor(
     private val _favoriteTracks = MutableStateFlow<List<JamendoTrack>>(emptyList())
     val favoriteTracks: StateFlow<List<JamendoTrack>> = _favoriteTracks.asStateFlow()
 
-    private val _downloadedTracks = MutableStateFlow<List<JamendoTrack>>(emptyList())
-    val downloadedTracks: StateFlow<List<JamendoTrack>> = _downloadedTracks.asStateFlow()
+    private val _downloadedTracks = MutableStateFlow<List<DownloadedSong>>(emptyList())
+    val downloadedTracks: StateFlow<List<DownloadedSong>> = _downloadedTracks.asStateFlow()
 
     private val _recentHistory = MutableStateFlow<List<JamendoTrack>>(emptyList())
     val recentHistory: StateFlow<List<JamendoTrack>> = _recentHistory.asStateFlow()
@@ -56,19 +57,21 @@ class PlaylistViewModel @Inject constructor(
         }
     }
 
-    fun loadDownloads(userId: Long) {
+    fun loadDownloads() {
         viewModelScope.launch {
-            repository.getDownloadedTracks(userId)
+            repository.getDownloadedSongs()
                 .collect { list -> _downloadedTracks.value = list }
         }
     }
 
-    fun toggleDownload(songId: Long, userId: Long, filePath: String) {
+    fun toggleDownloaded(track: JamendoTrack, filePath: String) {
         viewModelScope.launch {
-            repository.toggleDownloaded(songId, userId, filePath)
-            loadDownloads(userId)
+            repository.toggleDownloaded(track, filePath)
         }
     }
+
+
+
 
     fun markPlayed(songId: Long, userId: Long) {
         viewModelScope.launch {

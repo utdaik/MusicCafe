@@ -7,9 +7,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.withContext
 
@@ -101,14 +105,6 @@ class MusicRepository @Inject constructor(
     fun isSongFavoriteFlow(songId: Long, userId: Long): Flow<Boolean> =
         appDao.isSongFavoriteFlow(songId, userId)
 
-    suspend fun addFavoriteSong(songId: Long, userId: Long) = withContext(Dispatchers.IO) {
-        appDao.addFavorite(FavoriteSong(songId, userId))
-    }
-
-    suspend fun removeFavoriteSong(songId: Long, userId: Long) = withContext(Dispatchers.IO) {
-        appDao.removeFavorite(songId, userId)
-    }
-
     suspend fun toggleFavoriteSong(songId: Long, userId: Long) = withContext(Dispatchers.IO) {
         val currentlyFav = appDao.isSongFavoriteFlow(songId, userId).first()
         if (currentlyFav) appDao.removeFavorite(songId, userId)
@@ -118,45 +114,58 @@ class MusicRepository @Inject constructor(
     /** Lấy danh sách JamendoTrack đã favorite */
     @OptIn(ExperimentalCoroutinesApi::class)
     fun getFavoriteTracks(userId: Long): Flow<List<JamendoTrack>> =
-        appDao.getFavoriteIdsFlow(userId)   // Flow<List<Long>>
+        appDao.getFavoriteIdsFlow(userId)      // Flow<List<Long>>
             .flatMapLatest { ids ->
                 flow {
-                    // lần lượt gọi API cho từng id và gom về List<JamendoTrack>
-                    val tracks = ids.mapNotNull { id ->
-                        jamendoApiService.getTrackById(id.toString())
-                            .takeIf { it.isSuccessful }
-                            ?.body()
-                            ?.tracks
-                            ?.firstOrNull()
+                    // nếu không có id thì trả về list rỗng ngay
+                    if (ids.isEmpty()) {
+                        emit(emptyList())
+                        return@flow
                     }
-                    emit(tracks)
+
+                    // khởi tạo một coroutineScope để chạy song song
+                    val tracks = coroutineScope {
+                        ids.map { id ->
+                            async(Dispatchers.IO) {
+                                jamendoApiService
+                                    .getTrackById(id.toString())
+                                    .takeIf { it.isSuccessful }
+                                    ?.body()
+                                    ?.tracks
+                                    ?.firstOrNull()
+                            }
+                        }.awaitAll()
+                    }
+                    // lọc null và emit
+                    emit(tracks.filterNotNull())
                 }
             }
 
-
     // ======================== DOWNLOADED ========================
 
-    fun isSongDownloadedFlow(songId: Long, userId: Long): Flow<Boolean> =
-        appDao.isSongDownloadedFlow(songId, userId)
+    // Flow báo trạng thái đã tải hay chưa
+    fun isSongDownloadedFlow(songId: Long): Flow<Boolean> =
+        appDao.isSongDownloadedFlow(songId)
 
-    /** Thêm / xóa bản ghi downloaded (với đường dẫn file trên máy) */
-    suspend fun toggleDownloaded(songId: Long, userId: Long, filePath: String) = withContext(Dispatchers.IO) {
-        val exists = appDao.isSongDownloadedFlow(songId, userId).first()
-        if (exists) appDao.removeDownloaded(songId, userId)
-        else        appDao.addDownloaded(DownloadedSong(songId, userId, filePath))
-    }
-
-    /** Lấy danh sách JamendoTrack đã download */
-    fun getDownloadedTracks(userId: Long): Flow<List<JamendoTrack>> = flow {
-        val ids = appDao.getDownloadedSongIds(userId)
-        emit(ids)
-    }.mapLatest { ids ->
-        if (ids.isEmpty()) emptyList()
-        else {
-            val csv = ids.joinToString(",")
-            jamendoApiService.getTrackById(csv).body()?.tracks ?: emptyList()
+    // Toggle download & lưu metadata
+    suspend fun toggleDownloaded(track: JamendoTrack, filePath: String) = withContext(Dispatchers.IO) {
+        val exists = appDao.isSongDownloadedFlow(track.id).first()
+        if (exists) {
+            appDao.removeDownloaded(track.id)
+        } else {
+            appDao.addDownloaded(DownloadedSong(
+                songId     = track.id,
+                title      = track.title,
+                artist     = track.artist,
+                albumImage = track.albumImage,
+                filePath   = filePath
+            ))
         }
     }
+
+    // Lấy list offline dưới dạng JamendoTrack
+    fun getDownloadedSongs(): Flow<List<DownloadedSong>> =
+        appDao.getAllDownloaded()
 
 
     // ======================== HISTORY ========================

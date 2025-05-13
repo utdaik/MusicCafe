@@ -96,7 +96,7 @@ fun PlaylistScreen(
                     modifier = Modifier.size(110.dp),
                     iconRes = R.drawable.downloading,
                     label   = "Tải về",
-                    onClick = { /*…*/ }
+                    onClick = {navController.navigate("download")}
                 )
                 LibraryCategoryCard(
                     modifier = Modifier.size(110.dp),

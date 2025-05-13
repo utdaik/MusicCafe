@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
@@ -34,7 +35,10 @@ fun CustomExoPlayerScreen(
     val trackState by viewModel.tracks.collectAsState()
     val isFav by viewModel.isFavorite.collectAsState()
     val mainState = mainViewModel.uiState.collectAsState()
+    val isDownloaded by viewModel.isDownloaded.collectAsState()
     var userId = mainState.value.userId
+
+    val context = LocalContext.current
 
     val showBottomSheet = remember { mutableStateOf(false) }
     val showPlaylistSheet = remember { mutableStateOf(false) }
@@ -87,6 +91,16 @@ fun CustomExoPlayerScreen(
                     modifier = Modifier.size(32.dp)
                 )
             }
+            Spacer(Modifier.width(8.dp))
+            // Download button
+            IconButton(onClick = { viewModel.onDownloadClicked(trackState!!, context) }) {
+                Icon(
+                    imageVector = if (isDownloaded) Icons.Filled.Download else Icons.Filled.DownloadForOffline,
+                    contentDescription = "Download",
+                    tint = if (isDownloaded) Color.Green else Color.Gray
+                )
+            }
+
         }
         }
 

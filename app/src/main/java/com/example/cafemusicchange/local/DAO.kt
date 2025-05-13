@@ -98,22 +98,20 @@ interface AppDao {
 
     // ======================== DOWNLOADED ========================
 
-    /** Flow báo trạng thái đã tải về hay chưa */
-    @Query("SELECT EXISTS(SELECT 1 FROM downloaded_song WHERE songId = :songId AND userId = :userId)")
-    fun isSongDownloadedFlow(songId: Long, userId: Long): Flow<Boolean>
+    // Lấy toàn bộ danh sách đã download
+    @Query("SELECT * FROM downloaded_song")
+    fun getAllDownloaded(): Flow<List<DownloadedSong>>
 
-    /** Thêm bản ghi downloaded (ghi đè nếu đã tồn tại) */
+    // Kiểm tra xem đã download chưa
+    @Query("SELECT EXISTS(SELECT 1 FROM downloaded_song WHERE songId = :songId)")
+    fun isSongDownloadedFlow(songId: Long): Flow<Boolean>
+
+    // Thêm / Xóa bản ghi download
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun addDownloaded(downloaded: DownloadedSong)
 
-    /** Xóa bản ghi downloaded */
-    @Query("DELETE FROM downloaded_song WHERE songId = :songId AND userId = :userId")
-    suspend fun removeDownloaded(songId: Long, userId: Long)
-
-    /** Lấy list songId đã download để hiển thị offline */
-    @Query("SELECT songId FROM downloaded_song WHERE userId = :userId")
-    suspend fun getDownloadedSongIds(userId: Long): List<Long>
-
+    @Query("DELETE FROM downloaded_song WHERE songId = :songId")
+    suspend fun removeDownloaded(songId: Long)
 
     // ======================== HISTORY ========================
 
